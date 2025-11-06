@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Сердечко из слов — I Love You</title>
+    <style>
+    :root{background:#111;color:#fff}
+    html,body{height:100%;margin:0}
+    body{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 20% 20%, #2b0326 0%, #08030a 45%, #000 100%);font-family:Inter, system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial}
+    .wrap{width:100%;max-width:960px;height:80vh;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center}
+    canvas{width:100%;height:100%;display:block;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.02)}
+    .controls{display:flex;gap:10px;align-items:center;color:#eee;font-size:14px}
+    .controls label{opacity:.9}
+    .controls input[type=range]{accent-color:#ff5c8a}
+    .credits{font-size:12px;color:#bbb;margin-top:6px}
+    #centerImage{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;width:150px;height:150px;object-fit:cover;box-shadow:0 0 25px rgba(255,100,150,0.8);}
+    </style>
+</head>
+<body>
+    <div class="wrap" style="position:relative;">
+    <canvas id="c"></canvas>
+    <img id="centerImage" src="Изображение WhatsApp 2025-10-27 в 19.33.10_5fdfdd3d.jpg" alt="Любимый человек" />
+
+    <div class="controls">
+        <label>Количество слов: <span id="countLabel">60</span></label>
+        <input id="count" type="range" min="8" max="200" value="60">
+
+        <label style="margin-left:12px">Скорость: <span id="speedLabel">1.0</span></label>
+        <input id="speed" type="range" min="0" max="3" step="0.05" value="1">
+
+        <label style="margin-left:12px">Размер шрифта: <span id="fontLabel">20</span>px</label>
+        <input id="font" type="range" min="10" max="48" value="20">
+    </div>
+    <div class="credits">Кликните по канвасу, чтобы менять цвет текста; замените <code>your-photo.jpg</code> на путь к вашему фото.</div>
+    </div>
+
+<script>
+(() => {
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+
+    const countRange = document.getElementById('count');
+    const countLabel = document.getElementById('countLabel');
+    const speedRange = document.getElementById('speed');
+    const speedLabel = document.getElementById('speedLabel');
+    const fontRange = document.getElementById('font');
+    const fontLabel = document.getElementById('fontLabel');
+
+    let DPR = Math.max(1, window.devicePixelRatio || 1);
+    function resize(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * DPR);
+    canvas.height = Math.round(rect.height * DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    center = {x: rect.width/2, y: rect.height/2};
+    }
+
+    function heartXY(t, size){
+    const x = 16*Math.pow(Math.sin(t),3);
+    const y = 13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+    return {x: x*size, y: -y*size};
+    }
+
+    let center = {x:0,y:0};
+    let items = [];
+    let baseColor = '#ff95b4';
+    let time = 0;
+
+    function buildItems(){
+    const n = parseInt(countRange.value,10);
+    items = [];
+    for(let i=0;i<n;i++){
+      const t = (i / n) * Math.PI*2;
+        const phase = Math.random()*Math.PI*2;
+      const spin = (Math.random()*2-1) * (0.5 + Math.random()*1.5);
+        items.push({t,phase,spin});
+    }
+    countLabel.textContent = n;
+    }
+
+    function draw(){
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0,0,rect.width,rect.height);
+
+    const g = ctx.createRadialGradient(center.x, center.y-rect.height*0.05, rect.width*0.03, center.x, center.y, rect.width*0.9);
+    g.addColorStop(0, 'rgba(255,130,170,0.12)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,rect.width,rect.height);
+
+    const size = Math.min(rect.width, rect.height) / 40;
+
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    const fontSize = parseInt(fontRange.value,10);
+    ctx.font = `${fontSize}px system-ui, -apple-system, 'Segoe UI', Roboto, Arial`;
+
+    const n = items.length;
+    const speedMult = parseFloat(speedRange.value);
+
+    for(let i=0;i<n;i++){
+        const it = items[i];
+        const travel = (it.t + time*0.12*speedMult) % (Math.PI*2);
+        const pos = heartXY(travel, size);
+        const x = center.x + pos.x;
+        const y = center.y + pos.y;
+        const delta = 0.0001;
+        const p1 = heartXY(travel - delta, size);
+        const p2 = heartXY(travel + delta, size);
+        const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const localSpin = it.spin * time * 0.8 * speedMult + it.phase;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(ang + localSpin);
+        const alpha = 0.6 + 0.4*(1 - (y - (center.y - rect.height*0.5)) / rect.height);
+        ctx.fillStyle = hexToRgba(baseColor, alpha);
+      const scale = 0.9 + 0.4 * Math.sin(time*0.7 + i);
+        ctx.scale(scale, scale);
+        ctx.fillText('I Love You', 0, 0);
+        ctx.restore();
+    }
+    }
+
+    function hexToRgba(hex, a){
+    const h = hex.replace('#','');
+    const r = parseInt(h.substring(0,2),16);
+    const g = parseInt(h.substring(2,4),16);
+    const b = parseInt(h.substring(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+    }
+
+    let last = performance.now();
+    function loop(now){
+    const dt = (now - last)/1000;
+    last = now;
+    time += dt;
+    draw();
+    requestAnimationFrame(loop);
+    }
+
+    canvas.addEventListener('click', ()=>{
+    baseColor = `#${Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0')}`;
+    });
+
+    window.addEventListener('resize', ()=>{ resize(); });
+
+    countRange.addEventListener('input', ()=>{ buildItems(); });
+    speedRange.addEventListener('input', ()=>{ speedLabel.textContent = parseFloat(speedRange.value).toFixed(2); });
+    fontRange.addEventListener('input', ()=>{ fontLabel.textContent = fontRange.value; });
+
+    function init(){
+    DPR = Math.max(1, window.devicePixelRatio || 1);
+    resize();
+    buildItems();
+    speedLabel.textContent = parseFloat(speedRange.value).toFixed(2);
+    fontLabel.textContent = fontRange.value;
+    requestAnimationFrame(loop);
+    }
+
+    setTimeout(init, 50);
+})();
+</script>
+</body>
+</html>
